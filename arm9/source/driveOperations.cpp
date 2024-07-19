@@ -23,8 +23,6 @@
 #include "io_m3_common.h"
 #include "io_g6_common.h"
 #include "io_sc_common.h"
-// #include "io_gbcf.h"
-// #include "io_scsd.h"
 #include "exptools.h"
 
 #include "driveMenu.h"
@@ -58,28 +56,6 @@ u64 sdSize = 0;
 u64 fatSize = 0;
 u64 imgSize = 0;
 u32 ramdSize = 0;
-
-/*const DISC_INTERFACE io_gbcf_ = {
-    0x47424346, // "GBCF"
-    FEATURE_MEDIUM_CANREAD | FEATURE_MEDIUM_CANWRITE | FEATURE_SLOT_GBA,
-    (FN_MEDIUM_STARTUP)&CF_StartUp,
-    (FN_MEDIUM_ISINSERTED)&CF_IsInserted,
-    (FN_MEDIUM_READSECTORS)&CF_ReadSectors,
-    (FN_MEDIUM_WRITESECTORS)&CF_WriteSectors,
-    (FN_MEDIUM_CLEARSTATUS)&CF_ClearStatus,
-    (FN_MEDIUM_SHUTDOWN)&CF_Shutdown
-};
-
-const DISC_INTERFACE io_scsd_ = {
-    0x53435344, // "SCSD"
-    FEATURE_MEDIUM_CANREAD | FEATURE_MEDIUM_CANWRITE | FEATURE_SLOT_GBA,
-    (FN_MEDIUM_STARTUP)&_SCSD_startUp,
-    (FN_MEDIUM_ISINSERTED)&_SCSD_isInserted,
-    (FN_MEDIUM_READSECTORS)&_SCSD_readSectors,
-    (FN_MEDIUM_WRITESECTORS)&_SCSD_writeSectors,
-    (FN_MEDIUM_CLEARSTATUS)&_SCSD_clearStatus,
-    (FN_MEDIUM_SHUTDOWN)&_SCSD_shutdown
-};*/
 
 const char* getDrivePath(void) {
 	switch (currentDrive) {
@@ -356,9 +332,6 @@ bool sdMount(bool yButton) {
 		if (flashcardMounted) {
 			if (access("fat:/gm9i/slot2.dldi", F_OK) == 0)fatMountSimple("slot2", &dldiLoadFromFile("fat:/gm9i/slot2.dldi")->ioInterface);
 		}
-		// fatMountSimple("slot2", &io_gbcf_);
-		// _SC_changeMode (SC_MODE_MEDIA);
-		// fatMountSimple("slot2", &io_scsd_); 
 	}
 	if (sdFound()) {
 		sdMountedDone = true;

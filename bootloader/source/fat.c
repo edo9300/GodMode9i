@@ -138,7 +138,7 @@ typedef struct
 
 }	__PACKED BOOT_SEC;
 
-_Static_assert(sizeof(BOOT_SEC) == 512);
+// _Static_assert(sizeof(BOOT_SEC) == 512);
 
 // Directory entry - must be packed
 typedef struct

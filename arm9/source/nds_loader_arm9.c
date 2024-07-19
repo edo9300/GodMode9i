@@ -146,7 +146,7 @@ static const data_t dldiMagicLoaderString[] = "\xEE\xA5\x8D\xBF Chishm";	// Diff
 
 #define DEVICE_TYPE_DLDI 0x49444C44
 
-static bool dldiPatchLoader (data_t *binData, u32 binSize, bool clearBSS)
+static bool dldiPatchLoader (data_t *binData, u32 binSize, bool clearBSS, bool useSlot2)
 {
 	addr_t memOffset;			// Offset of DLDI after the file is loaded into memory
 	addr_t patchOffset;			// Position of patch destination in the file
@@ -171,7 +171,12 @@ static bool dldiPatchLoader (data_t *binData, u32 binSize, bool clearBSS)
 		return false;
 	}
 
-	pDH = (data_t*)(io_dldi_data);
+	if (useSlot2 && (access("fat:/gm9i/slot2.dldi", F_OK) == 0)) {
+		pDH = (data_t*)dldiLoadFromFile("fat:/gm9i/slot2.dldi");
+	} else {
+		pDH = (data_t*)io_dldi_data;
+	}
+	
 	
 	pAH = &(binData[patchOffset]);
 
@@ -255,8 +260,7 @@ static bool dldiPatchLoader (data_t *binData, u32 binSize, bool clearBSS)
 	return true;
 }
 
-int runNds (const void* loader, u32 loaderSize, u32 cluster, bool initDisc, bool dldiPatchNds, int argc, const char** argv)
-{
+int runNds (const void* loader, u32 loaderSize, u32 cluster, bool initDisc, bool dldiPatchNds, int argc, const char** argv, bool isSlot2) {
 	char* argStart;
 	u16* argData;
 	u16 argTempVal = 0;
@@ -290,23 +294,17 @@ int runNds (const void* loader, u32 loaderSize, u32 cluster, bool initDisc, bool
 	argData = (u16*)argStart;
 	argSize = 0;
 	
-	for (; argc > 0 && *argv; ++argv, --argc) 
-	{
-		for (argChar = *argv; *argChar != 0; ++argChar, ++argSize) 
-		{
-			if (argSize & 1) 
-			{
+	for (; argc > 0 && *argv; ++argv, --argc) {
+		for (argChar = *argv; *argChar != 0; ++argChar, ++argSize) {
+			if (argSize & 1) {
 				argTempVal |= (*argChar) << 8;
 				*argData = argTempVal;
 				++argData;
-			} 
-			else 
-			{
+			} else {
 				argTempVal = *argChar;
 			}
 		}
-		if (argSize & 1)
-		{
+		if (argSize & 1) {
 			*argData = argTempVal;
 			++argData;
 		}
@@ -321,7 +319,7 @@ int runNds (const void* loader, u32 loaderSize, u32 cluster, bool initDisc, bool
 		
 	if(dldiPatchNds) {
 		// Patch the loader with a DLDI for the card
-		if (!dldiPatchLoader ((data_t*)LCDC_BANK_C, loaderSize, initDisc)) {
+		if (!dldiPatchLoader ((data_t*)LCDC_BANK_C, loaderSize, initDisc, isSlot2)) {
 			return 3;
 		}
 	}
@@ -342,7 +340,7 @@ int runNds (const void* loader, u32 loaderSize, u32 cluster, bool initDisc, bool
 	return true;
 }
 
-int runNdsFile (const char* filename, int argc, const char** argv)  {
+int runNdsFile (const char* filename, int argc, const char** argv, bool useSlot2)  {
 	struct stat st;
 	char filePath[PATH_MAX];
 	int pathLen;
@@ -375,7 +373,7 @@ int runNdsFile (const char* filename, int argc, const char** argv)  {
 	
 	installBootStub(havedsiSD);
 
-	return runNds (load_bin, load_bin_size, st.st_ino, true, true, argc, argv);
+	return runNds (load_bin, load_bin_size, st.st_ino, true, true, argc, argv, useSlot2);
 }
 
 /*

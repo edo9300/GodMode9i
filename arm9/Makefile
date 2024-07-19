@@ -52,7 +52,7 @@ CFLAGS	:=	-g -Wall -Wno-psabi -O2 \
 		-ffast-math \
 		$(ARCH)
 
-CFLAGS	+=	$(INCLUDE) -DARM9 -D_NO_BOOTSTUB_ -D_IO_MMCF -D_IO_ALLOW_UNALIGNED -D_IO_USEFASTCNT
+CFLAGS	+=	$(INCLUDE) -DARM9 -D_NO_BOOTSTUB_
 CXXFLAGS	:= $(CFLAGS) -fno-exceptions -std=gnu++17
 
 ASFLAGS	:=	-g $(ARCH)

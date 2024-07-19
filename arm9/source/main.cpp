@@ -39,6 +39,7 @@ int ownNitroFSMounted;
 std::string prevTime;
 
 bool fatInitComplete = false;
+bool ramMountSkipped = false;
 
 bool applaunch = false;
 
@@ -134,11 +135,39 @@ int main(int argc, char **argv) {
 			font->print(-2, -2, false, "Do this if it crashes here", Alignment::right);
 		}*/
 	}
-
+		
 	// Display for 2 seconds
 	font->update(false);
-	for (int i = 0; i < 60*2; i++)swiWaitForVBlank();
+	bool Break = false;
+	
+	for (int i = 0; i < (60 * 2); i++) {
+		swiWaitForVBlank();
+		scanKeys();
+		switch (keysDown()) {
+			case KEY_Y:
+				yHeld = true;
+				Break = true;
+				break;
+			case KEY_X:
+				ramMountSkipped = true;
+				Break = true;
+				break;
+			case KEY_B:
+				Break = true;
+				break;
+		}
+		if (Break)break;
+		// if ((keysHeld() & KEY_Y) || (keysHeld() & KEY_X))break;
+	}
 
+	scanKeys();
+	
+	switch (keysDown()) {
+		case KEY_Y: yHeld = true; break;
+		case KEY_X: ramMountSkipped = true; break;
+	}
+	
+	
 	font->clear(false);
 	font->print(1, 1, false, titleName);
 	font->print(1, 2, false, "----------------------------------------");
@@ -151,31 +180,32 @@ int main(int argc, char **argv) {
 	if (!sdRemoved)sdMounted = sdMount(yHeld);
 	
 	if (isDSiMode()) {
-		scanKeys();
-		yHeld = (keysHeld() & KEY_Y);
-		*(vu32*)(0x0DFFFE0C) = 0x474D3969;		// Check for 32MB of RAM
-		bool ram32MB = *(vu32*)(0x0DFFFE0C) == 0x474D3969;
-		ramdriveMount(ram32MB);
-		if (ram32MB) {
-			is3DS = fifoGetValue32(FIFO_USER_05) != 0xD2;
+		if (!ramMountSkipped) {
+			*(vu32*)(0x0DFFFE0C) = 0x474D3969;		// Check for 32MB of RAM
+			bool ram32MB = *(vu32*)(0x0DFFFE0C) == 0x474D3969;
+			ramdriveMount(ram32MB);
+			if (ram32MB) {
+				is3DS = fifoGetValue32(FIFO_USER_05) != 0xD2;
+			}
+			//if (!(keysHeld() & KEY_X)) {
+				nandMount();
+			//}
+			//is3DS = ((access("sd:/Nintendo 3DS", F_OK) == 0) && (*(vu32*)(0x0DFFFE0C) == 0x474D3969));
+			/*FILE* cidFile = fopen("sd:/gm9i/CID.bin", "wb");
+			fwrite((void*)0x2FFD7BC, 1, 16, cidFile);
+			fclose(cidFile);*/
+			/*FILE* cidFile = fopen("sd:/gm9i/ConsoleID.bin", "wb");
+			fwrite((void*)0x2FFFD00, 1, 8, cidFile);
+			fclose(cidFile);*/
 		}
-		//if (!(keysHeld() & KEY_X)) {
-			nandMount();
-		//}
-		//is3DS = ((access("sd:/Nintendo 3DS", F_OK) == 0) && (*(vu32*)(0x0DFFFE0C) == 0x474D3969));
-		/*FILE* cidFile = fopen("sd:/gm9i/CID.bin", "wb");
-		fwrite((void*)0x2FFD7BC, 1, 16, cidFile);
-		fclose(cidFile);*/
-		/*FILE* cidFile = fopen("sd:/gm9i/ConsoleID.bin", "wb");
-		fwrite((void*)0x2FFFD00, 1, 8, cidFile);
-		fclose(cidFile);*/
 	} else if (REG_SCFG_EXT != 0) {
-		*(vu32*)(0x0DFFFE0C) = 0x474D3969;		// Check for 32MB of RAM
-		bool ram32MB = *(vu32*)(0x0DFFFE0C) == 0x474D3969;
-		ramdriveMount(ram32MB);
-		if (ram32MB) {
-			is3DS = fifoGetValue32(FIFO_USER_05) != 0xD2;
-		}
+		if (!ramMountSkipped) {
+			*(vu32*)(0x0DFFFE0C) = 0x474D3969;		// Check for 32MB of RAM
+			bool ram32MB = *(vu32*)(0x0DFFFE0C) == 0x474D3969;
+			ramdriveMount(ram32MB);
+			if (ram32MB) {
+				is3DS = fifoGetValue32(FIFO_USER_05) != 0xD2;
+			}
 
 		/* FILE* bios = fopen("sd:/_nds/bios9i.bin", "rb");
 		if (!bios) {
@@ -224,10 +254,10 @@ int main(int argc, char **argv) {
 
 			setVectorBase(0);
 			bios9iEnabled = true; */
-
+		}
 			nandMount();
 		// }
-	} else if (isRegularDS && (io_dldi_data->ioInterface.features & FEATURE_SLOT_NDS)) {
+	} else if (isRegularDS && (io_dldi_data->ioInterface.features & FEATURE_SLOT_NDS) && !ramMountSkipped) {
 		if (!sdMounted)ramdriveMount(false);
 	}
 	
@@ -237,36 +267,41 @@ int main(int argc, char **argv) {
 	}
 	
 	fatInitComplete = true;
-		
-	// Try to init NitroFS
-	char nandPath[64] = {0};
-	char sdnandPath[64] = {0};
-	if(isDSiMode()) {
-		sprintf(nandPath, "nand:/title/%08x/%08x/content/000000%02x.app", *(unsigned int*)0x02FFE234, *(unsigned int*)0x02FFE230, *(u8*)0x02FFE01E);
-		sprintf(sdnandPath, "sd:/title/%08x/%08x/content/000000%02x.app", *(unsigned int*)0x02FFE234, *(unsigned int*)0x02FFE230, *(u8*)0x02FFE01E);
-	}
-	ownNitroFSMounted = 0;
-	nitroMounted = true;
 	
-	if (isRegularDS && sdMounted) {
+	if (!ramMountSkipped) {
+		// Try to init NitroFS
+		char nandPath[64] = {0};
+		char sdnandPath[64] = {0};
+		if(isDSiMode()) {
+			sprintf(nandPath, "nand:/title/%08x/%08x/content/000000%02x.app", *(unsigned int*)0x02FFE234, *(unsigned int*)0x02FFE230, *(u8*)0x02FFE01E);
+			sprintf(sdnandPath, "sd:/title/%08x/%08x/content/000000%02x.app", *(unsigned int*)0x02FFE234, *(unsigned int*)0x02FFE230, *(u8*)0x02FFE01E);
+		}
+		ownNitroFSMounted = 0;
+		nitroMounted = true;
+			
+		if (isRegularDS && sdMounted) {
+			nitroMounted = false;
+			ownNitroFSMounted = 1;
+		} else {
+			if (argc > 0 && nitroFSInit(argv[0])) nitroCurrentDrive = argv[0][0] == 's' ? Drive::sdCard : Drive::flashcard;
+				else if (nandPath[0] && nitroFSInit(nandPath)) nitroCurrentDrive = Drive::nand;
+				else if (sdnandPath[0] && nitroFSInit(sdnandPath)) nitroCurrentDrive = Drive::sdCard;
+				else if (nitroFSInit("sd:/GodMode9i.nds")) nitroCurrentDrive = Drive::sdCard;
+				else if (nitroFSInit("sd:/GodMode9i.dsi")) nitroCurrentDrive = Drive::sdCard;
+				else if (nitroFSInit("fat:/GodMode9i.nds")) nitroCurrentDrive = Drive::flashcard;
+				else if (nitroFSInit("fat:/GodMode9i.dsi")) nitroCurrentDrive = Drive::flashcard;
+				else if (isRegularDS && nitroFSInit("slot2:/GodMode9i.nds"))nitroCurrentDrive = Drive::sdCard;
+				else {
+					ownNitroFSMounted = 1;
+					nitroMounted = false;
+					font->print(-2, -3, false, "NitroFS init failed...", Alignment::right);
+					font->update(false);
+					for (int i = 0; i < 30; i++)swiWaitForVBlank();
+			}
+		}
+	} else {
 		nitroMounted = false;
 		ownNitroFSMounted = 1;
-	} else {
-		if (argc > 0 && nitroFSInit(argv[0])) nitroCurrentDrive = argv[0][0] == 's' ? Drive::sdCard : Drive::flashcard;
-			else if (nandPath[0] && nitroFSInit(nandPath)) nitroCurrentDrive = Drive::nand;
-			else if (sdnandPath[0] && nitroFSInit(sdnandPath)) nitroCurrentDrive = Drive::sdCard;
-			else if (nitroFSInit("sd:/GodMode9i.nds")) nitroCurrentDrive = Drive::sdCard;
-			else if (nitroFSInit("sd:/GodMode9i.dsi")) nitroCurrentDrive = Drive::sdCard;
-			else if (nitroFSInit("fat:/GodMode9i.nds")) nitroCurrentDrive = Drive::flashcard;
-			else if (nitroFSInit("fat:/GodMode9i.dsi")) nitroCurrentDrive = Drive::flashcard;
-			else if (isRegularDS && nitroFSInit("slot2:/GodMode9i.nds"))nitroCurrentDrive = Drive::sdCard;
-			else {
-				ownNitroFSMounted = 1;
-				nitroMounted = false;
-				font->print(-2, -3, false, "NitroFS init failed...", Alignment::right);
-				font->update(false);
-				for (int i = 0; i < 30; i++)swiWaitForVBlank();
-		}
 	}
 	// Ensure gm9i folder exists
 	
@@ -361,7 +396,14 @@ int main(int argc, char **argv) {
 				argarray[0] = filePath;
 				font->clear(false);
 				font->printf(firstCol, 0, false, alignStart, Palette::white, STR_RUNNING_X_WITH_N_PARAMETERS.c_str(), argarray[0], argarray.size());
-				int err = runNdsFile(argarray[0], argarray.size(), (const char **)&argarray[0]);
+				int err = 0;
+				
+				if ((filePath[0] == 's') && (filePath[1] == 'l') && (filePath[2] == 'o') && (filePath[3] == 't') && (filePath[4] == '2')) {
+					err = runNdsFile(argarray[0], argarray.size(), (const char **)&argarray[0], true);
+				} else {
+					err = runNdsFile(argarray[0], argarray.size(), (const char **)&argarray[0], false);
+				}
+				
 				font->printf(firstCol, 1, false, alignStart, Palette::white, STR_START_FAILED_ERROR_N.c_str(), err);
 			}
 
