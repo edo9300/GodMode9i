@@ -8,12 +8,15 @@ endif
 
 include $(DEVKITARM)/ds_rules
 
+# I don't know how this works so disabled it to ensure I have proper version displayed.
 # If on a tagged commit, use just tag
-ifneq ($(shell echo $(shell git tag -l --points-at HEAD) | head -c 1),)
-GIT_VER := $(shell git tag -l --points-at HEAD)
-else
-GIT_VER := $(shell git describe --abbrev=0 --tags)-$(shell git rev-parse --short=7 HEAD)
-endif
+#ifneq ($(shell echo $(shell git tag -l --points-at HEAD) | head -c 1),)
+#GIT_VER := $(shell git tag -l --points-at HEAD)
+#else
+#GIT_VER := $(shell git describe --abbrev=0 --tags)-$(shell git rev-parse --short=7 HEAD)
+#endif
+
+GIT_VER := "3.5.5-Slot2"
 
 # Ensure version.h exists
 ifeq (,$(wildcard include/version.h))
