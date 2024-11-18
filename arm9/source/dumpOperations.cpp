@@ -8,6 +8,7 @@
 #include "font.h"
 #include "gba.h"
 #include "lzss.h"
+#include "lzss_enc.h"
 #include "main.h"
 #include "ndsheaderbanner.h"
 #include "read_card.h"
@@ -296,6 +297,8 @@ u32 cardNandGetSaveSize(void) {
 			return 16 << 20; // 16MByte - WarioWare D.I.Y.
 		case 0x004B5355: // 'USK'
 			return 64 << 20; // 64MByte - Face Training
+		case 0x00444755: // 'UGD'
+			return 128 << 20; // 128MByte - DS Guide
 	}
 
 	return 0;

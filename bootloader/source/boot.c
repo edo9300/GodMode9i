@@ -137,8 +137,9 @@ void passArgs_ARM7 (void) {
 
 	argDst = (u32*)((ARM9_DST + ARM9_LEN + 3) & ~3);		// Word aligned
 
-	if (dsiMode && (*(u8*)(NDS_HEAD + 0x012) & BIT(1)))
-	{
+	if (ARM9_LEN > 0x380000) {
+		argDst = (u32*)(TEMP_MEM - ((argSize/4)*4));
+	} else if (dsiMode && (*(u8*)(NDS_HEAD + 0x012) & BIT(1))) {
 		u32 ARM9i_DST = *((u32*)(TWL_HEAD + 0x1C8));
 		u32 ARM9i_LEN = *((u32*)(TWL_HEAD + 0x1CC));
 		if (ARM9i_LEN)
@@ -158,6 +159,19 @@ void passArgs_ARM7 (void) {
 
 
 
+
+static void initMBK_dsiMode(void) {
+	// This function has no effect with ARM7 SCFG locked
+	*(vu32*)REG_MBK1 = *(u32*)0x02FFE180;
+	*(vu32*)REG_MBK2 = *(u32*)0x02FFE184;
+	*(vu32*)REG_MBK3 = *(u32*)0x02FFE188;
+	*(vu32*)REG_MBK4 = *(u32*)0x02FFE18C;
+	*(vu32*)REG_MBK5 = *(u32*)0x02FFE190;
+	REG_MBK6 = *(u32*)0x02FFE1A0;
+	REG_MBK7 = *(u32*)0x02FFE1A4;
+	REG_MBK8 = *(u32*)0x02FFE1A8;
+	REG_MBK9 = *(u32*)0x02FFE1AC;
+}
 
 void memset_addrs_arm7(u32 start, u32 end)
 {
@@ -286,6 +300,8 @@ void loadBinary_ARM7 (u32 fileCluster)
 			fileRead(ARM9i_DST, fileCluster, ARM9i_SRC, ARM9i_LEN);
 		if (ARM7i_LEN)
 			fileRead(ARM7i_DST, fileCluster, ARM7i_SRC, ARM7i_LEN);
+
+		initMBK_dsiMode();
 	}
 }
 
@@ -319,6 +335,25 @@ int main (void) {
 #ifndef NO_SDMMC
 	sdRead = (dsiSD && dsiMode);
 #endif
+	if (wantToPatchDLDI) {
+		toncset((u32*)0x06000000, 0, 0x8000);
+		if (*(u32*)0x02FF4184 == 0x69684320) { // DLDI ' Chi' string in bootstub space + bootloader in DLDI driver space
+			const u16 dldiFileSize = 1 << *(u8*)0x02FF418D;
+			tonccpy((u32*)0x06000000, (u32*)0x02FF4180, dldiFileSize);
+			dldiRelocateBinary();
+
+			toncset((u32*)0x02FF4000, 0, 0x8180); // Clear bootstub + DLDI driver
+		} else if (*(u32*)0x02FF8004 == 0x69684320) { // DLDI ' Chi' string
+			const u16 dldiFileSize = 1 << *(u8*)0x02FF800D;
+			tonccpy((u32*)0x06000000, (u32*)0x02FF8000, (dldiFileSize > 0x4000) ? 0x4000 : dldiFileSize);
+			dldiClearBss();
+		} else if (*(u32*)0x02FF8000 == 0x53535A4C) { // LZ77 flag
+			dldiDecompressBinary();
+		} else {
+			return -1;
+		}
+	}
+
 	u32 fileCluster = storedFileCluster;
 	// Init card
 	if(!FAT_InitFiles(initDisc))
@@ -362,7 +397,9 @@ int main (void) {
 	sdRead = false;
 
 	// Fix for Pictochat and DLP
-	if (ROM_TID == 0x41444E48 || ROM_TID == 0x41454E48) {
+	if (ROM_TID == 0x41444E48 || ROM_TID == 0x41454E48
+	 || ROM_TID == 0x43444E48 || ROM_TID == 0x43454E48
+	 || ROM_TID == 0x4B444E48 || ROM_TID == 0x4B454E48) {
 		(*(vu16*)0x02FFFCFA) = 0x1041;	// NoCash: channel ch1+7+13
 	}
 

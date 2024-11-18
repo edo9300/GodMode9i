@@ -24,6 +24,7 @@
 #include "io_g6_common.h"
 #include "io_sc_common.h"
 #include "exptools.h"
+#include "read_card.h"
 
 #include "driveMenu.h"
 
@@ -56,6 +57,54 @@ u64 sdSize = 0;
 u64 fatSize = 0;
 u64 imgSize = 0;
 u32 ramdSize = 0;
+
+typedef signed int addr_t;
+typedef unsigned char data_t;
+#define FIX_ALL	0x01
+#define FIX_GLUE	0x02
+#define FIX_GOT	0x04
+#define FIX_BSS	0x08
+
+enum DldiOffsets {
+	DO_magicString = 0x00,			// "\xED\xA5\x8D\xBF Chishm"
+	DO_magicToken = 0x00,			// 0xBF8DA5ED
+	DO_magicShortString = 0x04,		// " Chishm"
+	DO_version = 0x0C,
+	DO_driverSize = 0x0D,
+	DO_fixSections = 0x0E,
+	DO_allocatedSpace = 0x0F,
+
+	DO_friendlyName = 0x10,
+
+	DO_text_start = 0x40,			// Data start
+	DO_data_end = 0x44,				// Data end
+	DO_glue_start = 0x48,			// Interworking glue start	-- Needs address fixing
+	DO_glue_end = 0x4C,				// Interworking glue end
+	DO_got_start = 0x50,			// GOT start					-- Needs address fixing
+	DO_got_end = 0x54,				// GOT end
+	DO_bss_start = 0x58,			// bss start					-- Needs setting to zero
+	DO_bss_end = 0x5C,				// bss end
+
+	// IO_INTERFACE data
+	DO_ioType = 0x60,
+	DO_features = 0x64,
+	DO_startup = 0x68,	
+	DO_isInserted = 0x6C,	
+	DO_readSectors = 0x70,	
+	DO_writeSectors = 0x74,
+	DO_clearStatus = 0x78,
+	DO_shutdown = 0x7C,
+	DO_code = 0x80
+};
+
+static addr_t readAddr (data_t *mem, addr_t offset) {
+	return ((addr_t*)mem)[offset/sizeof(addr_t)];
+}
+
+static void writeAddr (data_t *mem, addr_t offset, addr_t value) {
+	((addr_t*)mem)[offset/sizeof(addr_t)] = value;
+}
+
 
 const char* getDrivePath(void) {
 	switch (currentDrive) {
@@ -182,9 +231,102 @@ void sdUnmount(void) {
 	sdMounted = false;
 }
 
-TWL_CODE DLDI_INTERFACE* dldiLoadFromBin (const u8 dldiAddr[]) {
+TWL_CODE bool UpdateCardInfo(char* gameid, char* gamename) {
+	cardReadHeader((uint8*)0x02000000);
+	tonccpy(&nds, (void*)0x02000000, sizeof(sNDSHeader));
+	tonccpy(gameid, &nds.gameCode, 4);
+	gameid[4] = 0x00;
+	tonccpy(gamename, &nds.gameTitle, 12);
+	gamename[12] = 0x00;
+	return true;
+}
+
+TWL_CODE static void dldiRelocateBinary (data_t *binData, size_t dldiFileSize) {
+	addr_t memOffset;			// Offset of DLDI after the file is loaded into memory
+	addr_t relocationOffset;	// Value added to all offsets within the patch to fix it properly
+	addr_t ddmemOffset;			// Original offset used in the DLDI file
+	addr_t ddmemStart;			// Start of range that offsets can be in the DLDI file
+	addr_t ddmemEnd;			// End of range that offsets can be in the DLDI file
+	addr_t ddmemSize;			// Size of range that offsets can be in the DLDI file
+
+	addr_t addrIter;
+
+	data_t *pDH = binData;
+	data_t *pAH = (data_t*)(io_dldi_data);
+
+	// size_t dldiFileSize = 1 << pDH[DO_driverSize];
+
+	memOffset = readAddr (pAH, DO_text_start);
+	if (memOffset == 0) {
+		memOffset = readAddr (pAH, DO_startup) - DO_code;
+	}
+	ddmemOffset = readAddr (pDH, DO_text_start);
+	relocationOffset = memOffset - ddmemOffset;
+
+	ddmemStart = readAddr (pDH, DO_text_start);
+	ddmemSize = (1 << pDH[DO_driverSize]);
+	ddmemEnd = ddmemStart + ddmemSize;
+
+	// Remember how much space is actually reserved
+	pDH[DO_allocatedSpace] = pAH[DO_allocatedSpace];
+	// Copy the DLDI patch into the application
+	tonccpy (pAH, pDH, dldiFileSize);
+
+	// Fix the section pointers in the header
+	writeAddr (pAH, DO_text_start, readAddr (pAH, DO_text_start) + relocationOffset);
+	writeAddr (pAH, DO_data_end, readAddr (pAH, DO_data_end) + relocationOffset);
+	writeAddr (pAH, DO_glue_start, readAddr (pAH, DO_glue_start) + relocationOffset);
+	writeAddr (pAH, DO_glue_end, readAddr (pAH, DO_glue_end) + relocationOffset);
+	writeAddr (pAH, DO_got_start, readAddr (pAH, DO_got_start) + relocationOffset);
+	writeAddr (pAH, DO_got_end, readAddr (pAH, DO_got_end) + relocationOffset);
+	writeAddr (pAH, DO_bss_start, readAddr (pAH, DO_bss_start) + relocationOffset);
+	writeAddr (pAH, DO_bss_end, readAddr (pAH, DO_bss_end) + relocationOffset);
+	// Fix the function pointers in the header
+	writeAddr (pAH, DO_startup, readAddr (pAH, DO_startup) + relocationOffset);
+	writeAddr (pAH, DO_isInserted, readAddr (pAH, DO_isInserted) + relocationOffset);
+	writeAddr (pAH, DO_readSectors, readAddr (pAH, DO_readSectors) + relocationOffset);
+	writeAddr (pAH, DO_writeSectors, readAddr (pAH, DO_writeSectors) + relocationOffset);
+	writeAddr (pAH, DO_clearStatus, readAddr (pAH, DO_clearStatus) + relocationOffset);
+	writeAddr (pAH, DO_shutdown, readAddr (pAH, DO_shutdown) + relocationOffset);
+
+	if (pDH[DO_fixSections] & FIX_ALL) { 
+		// Search through and fix pointers within the data section of the file
+		for (addrIter = (readAddr(pDH, DO_text_start) - ddmemStart); addrIter < (readAddr(pDH, DO_data_end) - ddmemStart); addrIter++) {
+			if ((ddmemStart <= readAddr(pAH, addrIter)) && (readAddr(pAH, addrIter) < ddmemEnd)) {
+				writeAddr (pAH, addrIter, readAddr(pAH, addrIter) + relocationOffset);
+			}
+		}
+	}
+
+	if (pDH[DO_fixSections] & FIX_GLUE) { 
+		// Search through and fix pointers within the glue section of the file
+		for (addrIter = (readAddr(pDH, DO_glue_start) - ddmemStart); addrIter < (readAddr(pDH, DO_glue_end) - ddmemStart); addrIter++) {
+			if ((ddmemStart <= readAddr(pAH, addrIter)) && (readAddr(pAH, addrIter) < ddmemEnd)) {
+				writeAddr (pAH, addrIter, readAddr(pAH, addrIter) + relocationOffset);
+			}
+		}
+	}
+
+	if (pDH[DO_fixSections] & FIX_GOT) { 
+		// Search through and fix pointers within the Global Offset Table section of the file
+		for (addrIter = (readAddr(pDH, DO_got_start) - ddmemStart); addrIter < (readAddr(pDH, DO_got_end) - ddmemStart); addrIter++) {
+			if ((ddmemStart <= readAddr(pAH, addrIter)) && (readAddr(pAH, addrIter) < ddmemEnd)) {
+				writeAddr (pAH, addrIter, readAddr(pAH, addrIter) + relocationOffset);
+			}
+		}
+	}
+
+	if (pDH[DO_fixSections] & FIX_BSS) { 
+		// Initialise the BSS to 0
+		toncset (&pAH[readAddr(pDH, DO_bss_start) - ddmemStart] , 0, readAddr(pDH, DO_bss_end) - readAddr(pDH, DO_bss_start));
+	}
+}
+
+TWL_CODE void dldiLoadFromBin (const u8 dldiAddr[]) {
 	// Check that it is a valid DLDI
-	if (!dldiIsValid ((DLDI_INTERFACE*)dldiAddr))return NULL;
+	if (!dldiIsValid ((DLDI_INTERFACE*)dldiAddr)) {
+		return;
+	}
 
 	DLDI_INTERFACE* device = (DLDI_INTERFACE*)dldiAddr;
 	size_t dldiSize;
@@ -198,29 +340,60 @@ TWL_CODE DLDI_INTERFACE* dldiLoadFromBin (const u8 dldiAddr[]) {
 	}
 	dldiSize = (dldiSize + 0x03) & ~0x03; 		// Round up to nearest integer multiple
 	
-	// Clear unused space
-	toncset(device+dldiSize, 0, 0x4000-dldiSize);
-
-	dldiFixDriverAddresses (device);
-
-	if (device->ioInterface.features & FEATURE_SLOT_GBA) {
-		sysSetCartOwner(BUS_OWNER_ARM9);
-	}
-	if (device->ioInterface.features & FEATURE_SLOT_NDS) {
-		sysSetCardOwner(BUS_OWNER_ARM9);
-	}
-	
-	return device;
+	dldiRelocateBinary ((data_t*)dldiAddr, dldiSize);
 }
 
-TWL_CODE bool UpdateCardInfo(char* gameid, char* gamename) {
-	cardReadHeader((uint8*)0x02000000);
-	tonccpy(&nds, (void*)0x02000000, sizeof(sNDSHeader));
-	tonccpy(gameid, &nds.gameCode, 4);
-	gameid[4] = 0x00;
-	tonccpy(gamename, &nds.gameTitle, 12);
-	gamename[12] = 0x00;
-	return true;
+TWL_CODE void dldiLoadFromLzss (const u8 dldiLzss[], const u32 len) {
+	*(u32*)0x02FF8000 = 0x53535A4C;
+	tonccpy((u32*)0x02FF8004, dldiLzss, len);
+
+	u32* dldiAddr = new u32[0x8000/sizeof(u32)];
+	LZ77_Decompress((u8*)0x02FF8004, (u8*)dldiAddr);
+
+	// Check that it is a valid DLDI
+	if (!dldiIsValid ((DLDI_INTERFACE*)dldiAddr)) {
+		delete[] dldiAddr;
+		return;
+	}
+
+	DLDI_INTERFACE* device = (DLDI_INTERFACE*)dldiAddr;
+	size_t dldiSize;
+
+	// Calculate actual size of DLDI
+	// Although the file may only go to the dldiEnd, the BSS section can extend past that
+	if (device->dldiEnd > device->bssEnd) {
+		dldiSize = (char*)device->dldiEnd - (char*)device->dldiStart;
+	} else {
+		dldiSize = (char*)device->bssEnd - (char*)device->dldiStart;
+	}
+	dldiSize = (dldiSize + 0x03) & ~0x03; 		// Round up to nearest integer multiple
+	
+	dldiRelocateBinary ((data_t*)dldiAddr, dldiSize);
+	delete[] dldiAddr;
+}
+
+TWL_CODE void myDldiLoadFromFile (const char* filename) {
+	u32* dldiAddr = new u32[0x8000/sizeof(u32)];
+	FILE* file = fopen(filename, "rb");
+	fread(dldiAddr, 1, 0x8000, file);
+	fclose(file);
+	// Check that it is a valid DLDI
+	if (!dldiIsValid ((DLDI_INTERFACE*)dldiAddr)) {
+		delete[] dldiAddr;
+		return;
+	}
+	DLDI_INTERFACE* device = (DLDI_INTERFACE*)dldiAddr;
+	size_t dldiSize;
+	// Calculate actual size of DLDI
+	// Although the file may only go to the dldiEnd, the BSS section can extend past that
+	if (device->dldiEnd > device->bssEnd) {
+		dldiSize = (char*)device->dldiEnd - (char*)device->dldiStart;
+	} else {
+		dldiSize = (char*)device->bssEnd - (char*)device->dldiStart;
+	}
+	dldiSize = (dldiSize + 0x03) & ~0x03; 		// Round up to nearest integer multiple
+	dldiRelocateBinary((data_t*)dldiAddr, dldiSize);
+	delete[] dldiAddr;
 }
 
 const DISC_INTERFACE *dldiGet(void) {
@@ -262,22 +435,31 @@ TWL_CODE bool twl_flashcardMount(void) {
 
 		sysSetCardOwner (BUS_OWNER_ARM7);	// 3DS fix
 
-		if (gameid[0] >= 0x00 && gameid[0] < 0x20) {
-			return false;
-		}
+		if (gameid[0] >= 0x00 && gameid[0] < 0x20)return false;
 
-		// Read a DLDI driver specific to the cart
-		if (!memcmp(gamename, "QMATETRIAL", 9) || !memcmp(gamename, "R4DSULTRA", 9)) {
-			io_dldi_data = dldiLoadFromBin(r4idsn_sd_dldi);
+		if (!memcmp(gamename, "QMATETRIAL", 9) || !memcmp(gamename, "R4DSULTRA", 9) // R4iDSN/R4 Ultra
+		 || !memcmp(gameid, "ACEK", 4) || !memcmp(gameid, "YCEP", 4) || !memcmp(gameid, "AHZH", 4) || !memcmp(gameid, "CHPJ", 4) || !memcmp(gameid, "ADLP", 4)) { // Acekard 2(i)
+			dldiLoadFromBin(ak2_dldi);
 			fatMountSimple("fat", dldiGet());
-		} else if (!memcmp(gameid, "ACEK", 4) || !memcmp(gameid, "YCEP", 4) || !memcmp(gameid, "AHZH", 4) || !memcmp(gameid, "CHPJ", 4) || !memcmp(gameid, "ADLP", 4)) {
-			io_dldi_data = dldiLoadFromBin(ak2_sd_dldi);
+		} else if (!memcmp(gameid, "ASMA", 4)) {
+			cardInit((sNDSHeaderExt*)((u32*)0x02FFC000)); // Original R4 needs card init for some cursed reason.
+			for (int i = 0; i < 30; i++) swiWaitForVBlank();
+			dldiLoadFromBin(r4tf_dldi);
 			fatMountSimple("fat", dldiGet());
-		} else if (sdMounted) {
-			if (isRegularDS) {
-				if (access("slot2:/gm9i/slot1.dldi", F_OK) == 0)fatMountSimple("fat", &dldiLoadFromFile("slot2:/gm9i/slot1.dldi")->ioInterface);
-			} else {
-				if (access("sd:/gm9i/slot1.dldi", F_OK) == 0)fatMountSimple("fat", &dldiLoadFromFile("sd:/gm9i/slot1.dldi")->ioInterface);
+		} else if (!memcmp(gameid, "DSGB", 4)) {
+			dldiLoadFromLzss(nrio_lz77, 0x30DD);
+			fatMountSimple("fat", dldiGet());
+		} /*else if (!memcmp(gameid, "ALXX", 4)) { // SuperCard DSTWO
+			dldiLoadFromBin(dstwo_dldi);
+			fatMountSimple("fat", dldiGet());
+		} */ else if (sdMounted) {
+			if (!isRegularDS) {
+				if (access("sd:/gm9i/slot1.dldi", F_OK) == 0) {
+					cardInit((sNDSHeaderExt*)((u32*)0x02FFC000)); // Original R4 needs card init for some cursed reason.
+					for (int i = 0; i < 30; i++) swiWaitForVBlank();
+					myDldiLoadFromFile("sd:/gm9i/slot1.dldi");
+					fatMountSimple("fat", dldiGet());
+				}
 			}
 		}
 
@@ -285,9 +467,7 @@ TWL_CODE bool twl_flashcardMount(void) {
 			fatGetVolumeLabel("fat", fatLabel);
 			fixLabel(fatLabel);
 			struct statvfs st;
-			if (statvfs("fat:/", &st) == 0) {
-				fatSize = st.f_bsize * st.f_blocks;
-			}
+			if (statvfs("fat:/", &st) == 0)fatSize = st.f_bsize * st.f_blocks;
 			return true;
 		}
 	}
@@ -352,6 +532,7 @@ bool sdMount(bool yButton) {
 void ramdriveMount(bool ram32MB) {
 	if(isDSiMode() || REG_SCFG_EXT != 0) {
 		ramdSectors = ram32MB ? 0xE000 : 0x6000;
+		
 		fatMountSimple("ram", &io_ram_drive);
 	} else if (isRegularDS && !sdMounted) {
 		ramdSectors = 0x8 + 0x4000;

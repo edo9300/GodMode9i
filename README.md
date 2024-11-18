@@ -5,7 +5,7 @@
 	<a href="https://github.com/DS-Homebrew/GodMode9i/actions/workflows/building.yml">
 		<img src="https://github.com/DS-Homebrew/GodMode9i/actions/workflows/building.yml/badge.svg" height="20" alt="Build status on GitHub Actions">
 	</a>
-	<a href="https://discord.gg/yD3spjv" style="padding-left: 5px; padding-right: 5px;">
+	<a href="https://discord.gg/fCzqcWteC4" style="padding-left: 5px; padding-right: 5px;">
 		<img src="https://img.shields.io/badge/Discord%20Server-%23GodMode9i-green.svg">
 	</a>
 	<a href="https://gbatemp.net/threads/release-godmode9i-all-access-file-browser-for-the-ds-i-and-3ds.520096/" style="padding-left: 5px;">
@@ -35,7 +35,11 @@ GodMode9i is a full access file browser for the Nintendo DS, Nintendo DSi and th
 - Mount the NitroFS of NDS files, DSiWare saves, and FAT images.
 - View and edit the contents of files with a hex editor.
 - Calculate the SHA-1 hash of files.
-- Browse files on supported flashcards when running GM9i from the NAND or SD Card. (`AceKard 2(i)` & `R4 Ultra (r4ultra.com)`)
+- Browse files on supported flashcards when running GM9i from the NAND or SD Card.
+   - Acekard 2(i)
+   - N-Card
+   - R4 (Original, no SDHC)
+   - R4(i) Ultra (r4ultra.com)
 - Browse files on the internal NAND of Nintendo DSi consoles.
 - Browse files on the SD Card when running GM9i from any DS-mode flashcard. (Requires **TW**i**L**ight Menu++ with Slot-1 SD/SCFG access enabled, and TWLMenu++ installed on the flashcard.)
 - Translated to many different languages. Join the [Crowdin project](https://crowdin.com/project/godmode9i) to contribute more!
@@ -57,29 +61,30 @@ GodMode9i uses the same FRF font files as [GodMode9](https://github.com/d0k3/God
 When loading GodMode9i will try to load `/gm9i/font.frf` on your SD card and if that fails will load the default font. To change the default font when building GodMode9i, replace `data/font_default.frf` with your font.
 
 ## Credits
-* [RocketRobz](https://github.com/RocketRobz): Main Developer.
-* [Evie/Pk11](https://github.com/Epicpkmn11): Contributor.
-* [zacchi4k](https://github.com/zacchi4k): Logo designer.
-* [Edo9300](https://github.com/edo9300): Save reading code from his save manager tool.
-* [endrift](https://github.com/endrift): GBA ROM dumping code from [duplo](https://github.com/endrift/duplo), used for 64MB ROMs.
-* [JimmyZ](https://github.com/JimmyZ): NAND code from twlnf (with writing code stripped for safety reasons).
-* [zoogie](https://github.com/zoogie): ConsoleID code (originating from dumpTool).
-* [devkitPro](https://github.com/devkitPro): devkitARM, libnds, original nds-hb-menu code, and screenshot code.
-* [d0k3](https://github.com/d0k3): Developer of GodMode9 for the Nintendo 3DS, which this is inspired by.
-* [門真 なむ (Num Kadoma)](https://littlelimit.net): k6x8 font used for the default font's Kanji and 美咲ゴシック font in resources folder
-   * Additional Chinese is from [Angelic47/FontChinese7x7](https://github.com/Angelic47/FontChinese7x7)
+- [RocketRobz](https://github.com/RocketRobz): Main Developer.
+- [Evie/Pk11](https://github.com/Epicpkmn11): Contributor.
+- [lifehackerhansol](https://github.com/lifehackerhansol): [libnds32](https://github.com/lifehackerhansol/libnds32) fork for 32KB DLDI driver support
+- [zacchi4k](https://github.com/zacchi4k): Logo designer.
+- [Edo9300](https://github.com/edo9300): Save reading code from his save manager tool.
+- [endrift](https://github.com/endrift): GBA ROM dumping code from [duplo](https://github.com/endrift/duplo), used for 64MB ROMs.
+- [JimmyZ](https://github.com/JimmyZ): NAND code from twlnf (with writing code stripped for safety reasons).
+- [zoogie](https://github.com/zoogie): ConsoleID code (originating from dumpTool).
+- [devkitPro](https://github.com/devkitPro): devkitARM, libnds, original nds-hb-menu code, and screenshot code.
+- [d0k3](https://github.com/d0k3): Developer of GodMode9 for the Nintendo 3DS, which this is inspired by.
+- [門真 なむ (Num Kadoma)](https://littlelimit.net): k6x8 font used for the default font's Kanji and 美咲ゴシック font in resources folder
+   - Additional Chinese is from [Angelic47/FontChinese7x7](https://github.com/Angelic47/FontChinese7x7)
 
 ### Translators
-* Chinese (Simplified): [cai_miao](https://crowdin.com/profile/cai_miao), [James-Makoto](https://crowdin.com/profile/vcmod55)
-* Dutch: [Minionguyjpro](https://crowdin.com/profile/minionguyjpro)
-* French: [Benjamin](https://crowdin.com/profile/sombrabsol), [Dhalian.](https://crowdin.com/profile/dhalian3630)
-* German: [redstonekasi](https://crowdin.com/profile/redstonekasi)
-* Hebrew: [Yaniv Levin](https://crowdin.com/profile/y4niv)
-* Hungarian: [Viktor Varga](http://github.com/vargaviktor)
-* Italian: [Malick](https://crowdin.com/profile/malick1160), [TM-47](https://crowdin.com/profile/-tm-), [zacchi4k](https://crowdin.com/profile/zacchi4k)
-* Japanese: [Cloud0835](https://crowdin.com/profile/cloud0835), [Pk11](https://github.com/Epicpkmn11)
-* Romanian: [Tescu](https://crowdin.com/profile/tescu48)
-* Russian: [Ckau](https://crowdin.com/profile/ckau), [Молодая Кукуруза](https://crowdin.com/profile/bessmertnyi_mikhail)
-* Spanish: [Allinxter](https://crowdin.com/profile/allinxter), [beta215](https://crowdin.com/profile/beta215)
-* Turkish: [Egehan.TWL](https://crowdin.com/profile/egehan.twl), [Grandmaquil](https://crowdin.com/profile/grandmaquil), [rewold20](https://crowdin.com/profile/rewold20)
-* Ukrainian: [GriShafir](https://crowdin.com/profile/grishafir)
+- Chinese (Simplified): [cai_miao](https://crowdin.com/profile/cai_miao), [James-Makoto](https://crowdin.com/profile/vcmod55)
+- Dutch: [Minionguyjpro](https://crowdin.com/profile/minionguyjpro)
+- French: [Benjamin](https://crowdin.com/profile/sombrabsol), [Dhalian.](https://crowdin.com/profile/dhalian3630)
+- German: [redstonekasi](https://crowdin.com/profile/redstonekasi)
+- Hebrew: [Yaniv Levin](https://crowdin.com/profile/y4niv)
+- Hungarian: [Viktor Varga](http://github.com/vargaviktor)
+- Italian: [Malick](https://crowdin.com/profile/malick1160), [TM-47](https://crowdin.com/profile/-tm-), [zacchi4k](https://crowdin.com/profile/zacchi4k)
+- Japanese: [Cloud0835](https://crowdin.com/profile/cloud0835), [Pk11](https://github.com/Epicpkmn11)
+- Romanian: [Tescu](https://crowdin.com/profile/tescu48)
+- Russian: [Ckau](https://crowdin.com/profile/ckau), [Молодая Кукуруза](https://crowdin.com/profile/bessmertnyi_mikhail)
+- Spanish: [Allinxter](https://crowdin.com/profile/allinxter), [beta215](https://crowdin.com/profile/beta215)
+- Turkish: [Egehan.TWL](https://crowdin.com/profile/egehan.twl), [Grandmaquil](https://crowdin.com/profile/grandmaquil), [rewold20](https://crowdin.com/profile/rewold20)
+- Ukrainian: [GriShafir](https://crowdin.com/profile/grishafir)

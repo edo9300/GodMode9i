@@ -317,8 +317,7 @@ static void switchToTwlBlowfish(sNDSHeaderExt* ndsHeader) {
 }
 
 
-int cardInit (sNDSHeaderExt* ndsHeader)
-{
+int cardInit (sNDSHeaderExt* ndsHeader) {
 	u32 portFlagsKey1, portFlagsSecRead;
 	normalChip = false; // As defined by GBAtek, normal chip secure area and header are accessed in blocks of 0x200, other chip in blocks of 0x1000
 	nandChip = false;
@@ -344,7 +343,7 @@ int cardInit (sNDSHeaderExt* ndsHeader)
 			NULL, 0);
 	}
 
-	REG_ROMCTRL=0;
+	/*REG_ROMCTRL=0;
 	REG_AUXSPICNT=0;
 	//ioDelay2(167550);
 	for(i = 0; i < 25; i++) { swiWaitForVBlank(); }
@@ -352,23 +351,23 @@ int cardInit (sNDSHeaderExt* ndsHeader)
 	REG_ROMCTRL=CARD_nRESET|CARD_SEC_SEED;
 	while(REG_ROMCTRL&CARD_BUSY) ;
 	cardReset();
-	while(REG_ROMCTRL&CARD_BUSY) ;
+	while(REG_ROMCTRL&CARD_BUSY) ;*/
 
 	toncset(headerData, 0, 0x1000);
+
+	// Read the header
+	// cardParamCommand (CARD_CMD_HEADER_READ, 0, CARD_ACTIVATE | CARD_nRESET | CARD_CLK_SLOW | CARD_BLK_SIZE(1) | CARD_DELAY1(0x1FFF) | CARD_DELAY2(0x3F), (void*)headerData, 0x200/sizeof(u32));
+	cardReadHeader((u8*)headerData);
+	
+	tonccpy(ndsHeader, headerData, 0x200);
+
 
 	iCardId=cardReadID(CARD_CLK_SLOW);
 	while(REG_ROMCTRL & CARD_BUSY);
 
 	normalChip = (iCardId & BIT(31)) != 0; // ROM chip ID MSB
 	nandChip = (iCardId & BIT(27)) != 0; // Card has a NAND chip
-
-	// Read the header
-	cardParamCommand (CARD_CMD_HEADER_READ, 0,
-		CARD_ACTIVATE | CARD_nRESET | CARD_CLK_SLOW | CARD_BLK_SIZE(1) | CARD_DELAY1(0x1FFF) | CARD_DELAY2(0x3F),
-		(void*)headerData, 0x200/sizeof(u32));
-
-	tonccpy(ndsHeader, headerData, 0x200);
-
+	
 	if ((ndsHeader->unitCode != 0) || (ndsHeader->dsi_flags != 0))
 	{
 		// Extended header found

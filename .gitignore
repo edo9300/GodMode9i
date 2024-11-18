@@ -5,6 +5,7 @@
 *.elf
 *.zip
 *.dldi
+*.app
 data/*.bin
 .vscode
 *.DS_Store
