@@ -27,6 +27,9 @@
  EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include <nds/memory.h>
+#include <cstring>
+
 #include "io_sc_common.h"
 
 /*-----------------------------------------------------------------
@@ -44,4 +47,46 @@ void _SC_changeMode(u8 mode) {
 	*unlockAddress = mode ;
 } 
 
+void _SC_enableFlashRW(SUPERCARD_TYPE supercardType) {
+	constexpr uint16_t SC_MODE_FLASH_RW		= 0x0004;
+	constexpr uint16_t SC_MODE_FLASH_RW_LITE	= 0x1510;
+	_SC_changeMode((supercardType & SC_LITE) ? SC_MODE_FLASH_RW_LITE : SC_MODE_FLASH_RW);
+}
 
+SUPERCARD_TYPE _SC_detectType() {
+	auto type = []{
+		constexpr uint16_t SC_MODE_SDCARD = 0x0002;
+		_SC_changeMode(SC_MODE_SDCARD);
+		auto val = *(volatile uint16_t*)0x09800000;
+		switch(val & 0xe300) {
+			case 0xa000:
+				return SUPERCARD_TYPE::SC_LITE;
+			case 0xc000:
+				return SUPERCARD_TYPE::SC_RUMBLE;
+			case 0xe000:
+				return SUPERCARD_TYPE::SC_SD;
+			default:
+				return SUPERCARD_TYPE::SC_CF;
+		}
+	}();
+	_SC_enableFlashRW(type);
+	return type;
+}
+
+#define GBA_BUS_U8 ((char*)GBA_BUS)
+bool findSCSFWParameters(SCSFW_PARAMETERS* params) {
+	memcpy(params, (void*)&GBA_BUS_U8[0xc0 + 4], sizeof(SCSFW_PARAMETERS));
+	if(params->scsfw_magic == 0x57464353) {
+		return true;
+	}
+	// supercard rumble
+	memcpy(params, (void*)&GBA_BUS_U8[0xc0 + 4 + 0x40000], sizeof(SCSFW_PARAMETERS));
+	// account for the values being offsetted
+	params->miniboot_arm7 += 0x40000;
+	params->miniboot_arm9 += 0x40000;
+	params->nds_rom += 0x40000;
+	params->sc_lite_dldi += 0x40000;
+	params->scsd_dldi += 0x40000;
+	params->sccf_dldi += 0x40000;
+	return params->scsfw_magic == 0x57464353;
+}

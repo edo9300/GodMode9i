@@ -39,12 +39,39 @@
 extern "C" {
 #endif
 
+typedef struct SCSFW_PARAMETERS {
+    unsigned int scsfw_magic;
+    unsigned int miniboot_arm7;
+    unsigned int miniboot_arm7_size;
+    unsigned int miniboot_arm9;
+    unsigned int miniboot_arm9_size;
+    unsigned int nds_rom;
+    unsigned int nds_rom_size;
+    unsigned int sc_lite_dldi;
+    unsigned int sc_lite_dldi_size;
+    unsigned int scsd_dldi;
+    unsigned int scsd_dldi_size;
+    unsigned int sccf_dldi;
+    unsigned int sccf_dldi_size;
+} SCSFW_PARAMETERS;
+
+typedef enum SUPERCARD_TYPE {
+    SC_SD = 0x00,
+    SC_LITE = 0x01,
+    SC_CF = 0x02,
+    SC_RUMBLE = (0x10 | SC_LITE),
+    UNK = ~SC_RUMBLE,
+} SUPERCARD_TYPE;
+
 // Values for changing mode
 #define SC_MODE_RAM 0x5
 #define SC_MODE_MEDIA 0x3 
 #define SC_MODE_RAM_RO 0x1
 
 extern void _SC_changeMode (u8 mode);
+extern SUPERCARD_TYPE _SC_detectType(void);
+extern void _SC_enableFlashRW(SUPERCARD_TYPE supercardType);
+extern bool findSCSFWParameters(SCSFW_PARAMETERS* params);
 
 #ifdef __cplusplus
 }

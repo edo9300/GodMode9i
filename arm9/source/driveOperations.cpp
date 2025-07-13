@@ -502,6 +502,8 @@ void flashcardUnmount(void) {
 	flashcardMounted = false;
 }
 
+#define GBA_BUS_U8 ((char*)GBA_BUS)
+
 bool sdMount(bool yButton) {
 	if (isDSiMode() || !isRegularDS) {
 		fifoSetValue32Handler(FIFO_USER_04, sdStatusHandler, nullptr);
@@ -510,7 +512,44 @@ bool sdMount(bool yButton) {
 		flashcardMounted = flashcardMount();
 		flashcardMountSkipped = false;
 		if (flashcardMounted) {
-			if (access("fat:/gm9i/slot2.dldi", F_OK) == 0)fatMountSimple("slot2", &dldiLoadFromFile("fat:/gm9i/slot2.dldi")->ioInterface);
+			SUPERCARD_TYPE type = _SC_detectType();
+			SCSFW_PARAMETERS parameters;
+			if(findSCSFWParameters(&parameters)) {
+				auto [start, size] = [&]{
+					void* start;
+					size_t size;
+					if(type & SC_LITE) {
+						start = (void*)&GBA_BUS_U8[parameters.sc_lite_dldi];
+						size = parameters.sc_lite_dldi_size;
+					} else if (type == SC_CF) {
+						start = (void*)&GBA_BUS_U8[parameters.sccf_dldi];
+						size = parameters.sccf_dldi_size;
+					} else {
+						start = (void*)&GBA_BUS_U8[parameters.scsd_dldi];
+						size = parameters.scsd_dldi_size;
+					}
+					return std::make_pair(start, size);
+				}();
+				auto alloc_size = [&]{
+					DLDI_INTERFACE* io = (DLDI_INTERFACE*)start;
+					if (io->dldiEnd > io->bssEnd) {
+						return (char*)io->dldiEnd - (char*)io->dldiStart;
+					} else {
+						return (char*)io->bssEnd - (char*)io->dldiStart;
+					}
+				}();
+				
+				DLDI_INTERFACE* io = (DLDI_INTERFACE*)aligned_alloc(4, alloc_size);
+				memcpy(io, start, size);
+				
+				if(!dldiIsValid(io)) {
+					free(io);
+					return false;
+				}
+				
+				dldiFixDriverAddresses(io);
+				fatMountSimple("slot2", &io->ioInterface);
+			}
 		}
 	}
 	if (sdFound()) {
