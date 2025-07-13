@@ -539,6 +539,10 @@ bool sdMount(bool yButton) {
 					}
 				}();
 				
+				if(auto offset = alloc_size % 4; offset != 0) {
+					alloc_size += 4 - offset;
+				}
+				
 				DLDI_INTERFACE* io = (DLDI_INTERFACE*)aligned_alloc(4, alloc_size);
 				memcpy(io, start, size);
 				
